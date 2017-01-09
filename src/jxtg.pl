@@ -28,6 +28,7 @@ unless (my $rc = do $config_file) {
 # DEFAULT VALUES. don't change them here
 # see comments in the 'config.pl'
 my $name          = $cfg{name}            // 'PodBot';
+my $alias         = $cfg{alias}           // '>';
 my $server        = $cfg{server}          // 'zhmylove.ru';
 my $port          = $cfg{port}            // 5222;
 my $username      = $cfg{username}        // 'jxtg';
@@ -44,11 +45,11 @@ my %room_passwords      = %{ $cfg{room_passwords}  // {
 # INTERNAL VARIABLES
 my @tg_queue :shared; share(@tg_queue);
 my @ja_queue :shared; share(@ja_queue);
-my $tg_bot :shared; share($tg_bot);
-my $ja_bot :shared; share($ja_bot);
 my $start_time = time;
 my %room_list;
 $room_list{$_} = [] for keys %room_passwords; # [] due to Bot.pm.patch
+
+$SIG{INT} = sub { print "Uptime: ", time - $start_time ; exit 0; };
 
 # PREPARE THREADS
 my $thr_tg = threads->create(\&thr_tg);
@@ -88,7 +89,7 @@ sub thr_q_ja {
       port => $port,
       username => $username,
       password => $password,
-      alias => $name,
+      alias => $alias,
       resource => $name . "_sender",
       safety_mode => 1,
       message_function => sub {undef},
@@ -156,7 +157,7 @@ sub thr_tg {
 
          # Ehhh~~! Ugly code ;-(
          $src =~ s/ +/ /g;
-         $src =~ s/ :/:/g;
+         $src =~ s/ (?=(:|$))//g;
 
          push @ja_queue, "$src: " . $text;
       }
@@ -170,7 +171,7 @@ sub process_ja_msg {
    my %msg = @_;
    my $src = (split '/', $msg{'from_full'})[1] // return;
 
-   return if $src eq $name;
+   return if $src eq $alias or $src eq $name;
    push @tg_queue, "$src: " . $msg{'body'};
 }
 
@@ -182,7 +183,7 @@ sub thr_ja {
       port => $port,
       username => $username,
       password => $password,
-      alias => $name,
+      alias => $alias,
       resource => $name . "_listener",
       safety_mode => 1,
       message_function => \&process_ja_msg,
