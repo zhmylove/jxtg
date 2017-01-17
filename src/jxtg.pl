@@ -64,9 +64,9 @@ sub thr_mon {
    sleep(60); # initial sleep
    print "Started self-monitor thread";
    for(;;sleep(15)){
-      my $count = map {$T{$_}->is_running()} @T;
+      my $count = eval join "+", map {$T{$_}->is_running()} @T;
       if (0+@T != $count) {
-         print "Self-monitor: threads: $count";
+         print "Self-monitor: threads: $count / " . 0+@T;
          exit(0x13);
       }
    }
