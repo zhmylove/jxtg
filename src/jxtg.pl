@@ -56,10 +56,21 @@ my $thr_tg = threads->create(\&thr_tg);
 my $thr_ja = threads->create(\&thr_ja);
 my $thr_q_tg = threads->create(\&thr_q_tg);
 my $thr_q_ja = threads->create(\&thr_q_ja);
+my $thr_mon  = threads->create(\&thr_mon);
 $thr_ja->join();
 $thr_tg->join();
 $thr_q_tg->join();
 $thr_q_ja->join();
+$thr_mon->join();
+
+# SELF MONITOR THREAD
+sub thr_mon {
+   sleep(60); # initial sleep
+   print "Started self-monitor thread";
+   for(;;sleep(15)){
+      exit(0x13) if 5 != threads->list(threads::running);
+   }
+}
 
 # TELEGRAM THREAD
 sub thr_q_tg {
