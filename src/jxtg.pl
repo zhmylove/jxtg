@@ -71,6 +71,7 @@ sub thr_q_tg {
       while(defined(my $msg = shift @tg_queue)){
          $tg->sendMessage({
                chat_id => $tg_chat_id,
+               parse_mode => "HTML",
                text => $msg,
             });
       }
@@ -172,7 +173,13 @@ sub process_ja_msg {
    my $src = (split '/', $msg{'from_full'})[1] // return;
 
    return if $src eq $alias or $src eq $name;
-   push @tg_queue, "$src: " . $msg{'body'};
+
+   my $text = $msg{'body'};
+   $text =~ s/</\&lt;/g;
+   $text =~ s/>/\&gt;/g;
+   $text =~ s/&/\&amp;/g;
+
+   push @tg_queue, "<b>$src</b>: " . $text;
 }
 
 sub thr_ja {
