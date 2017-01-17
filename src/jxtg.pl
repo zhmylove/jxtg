@@ -52,15 +52,11 @@ $room_list{$_} = [] for keys %room_passwords; # [] due to Bot.pm.patch
 $SIG{INT} = sub { print "Uptime: ", time - $start_time ; exit 0; };
 
 # PREPARE THREADS
-my $thr_tg = threads->create(\&thr_tg);
-my $thr_ja = threads->create(\&thr_ja);
-my $thr_q_tg = threads->create(\&thr_q_tg);
-my $thr_q_ja = threads->create(\&thr_q_ja);
+my @T = qw/thr_tg thr_ja thr_q_tg thr_q_ja/;
+my %T; $T{$_} = threads->create(\&{$_}) for @T;
 my $thr_mon  = threads->create(\&thr_mon);
-$thr_ja->join();
-$thr_tg->join();
-$thr_q_tg->join();
-$thr_q_ja->join();
+
+$T{$_}->join() for @T;
 $thr_mon->join();
 
 # SELF MONITOR THREAD
@@ -68,7 +64,11 @@ sub thr_mon {
    sleep(60); # initial sleep
    print "Started self-monitor thread";
    for(;;sleep(15)){
-      exit(0x13) if 5 != threads->list(threads::running);
+      my $count = map {$T{$_}->is_running()} @T;
+      if (0+@T != $count) {
+         print "Self-monitor: threads: $count";
+         exit(0x13);
+      }
    }
 }
 
