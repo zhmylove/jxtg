@@ -162,8 +162,21 @@ sub thr_tg {
          $upd->{message}{from}{last_name} // '';
 
          if (defined $upd->{message}{reply_to_message}) {
-            my $reply = join " ", $upd->{message}{reply_to_message}{from}{first_name},
+            my $reply = join " ",
+            $upd->{message}{reply_to_message}{from}{first_name},
             $upd->{message}{reply_to_message}{from}{last_name} // '';
+
+            if (
+               $tg_name eq
+               '@' . $upd->{message}{reply_to_message}{from}{username} // ''
+            ) {
+               # assuming my messages are only text
+               if (defined $upd->{message}{reply_to_message}{text}) {
+                  ($reply) =
+                  $upd->{message}{reply_to_message}{text} =~ m/^([^:]+):/;
+               }
+            }
+
             $src .= ": $reply"
          }
 
