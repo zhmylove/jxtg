@@ -168,7 +168,7 @@ sub thr_tg {
 
             if (
                $tg_name eq
-               '@' . $upd->{message}{reply_to_message}{from}{username} // ''
+               '@' . ($upd->{message}{reply_to_message}{from}{username} // '')
             ) {
                # assuming my messages are only text
                if (defined $upd->{message}{reply_to_message}{text}) {
