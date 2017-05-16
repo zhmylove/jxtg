@@ -177,7 +177,8 @@ sub thr_tg {
                }
             }
 
-            $src .= ": $reply"
+            $src .= ": $reply";
+            $src = $reply if $text =~ m{^\s*([+-])\1*\s*$};
          }
 
          # Ehhh~~! Ugly code ;-(
