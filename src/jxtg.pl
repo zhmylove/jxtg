@@ -199,9 +199,9 @@ sub process_ja_msg {
    return if $src eq $alias or $src eq $name;
 
    my $text = $msg{'body'};
-   $text =~ s/</\&lt;/g;
-   $text =~ s/>/\&gt;/g;
-   $text =~ s/&/\&amp;/g;
+   $text =~ s/</^/g;
+   $text =~ s/>/^/g;
+   $text =~ s/&/./g;
 
    push @tg_queue, "<b>$src</b>: " . $text;
 }
