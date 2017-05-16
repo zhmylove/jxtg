@@ -127,6 +127,57 @@ sub thr_q_ja {
    exit(0x17);
 }
 
+sub tg_photo_prepare {
+   my $upd = shift // return "";
+   my $tg = shift // return "";
+
+   my %sizes = ();
+   for (@{ $upd->{message}{photo} }) {
+      $sizes{ $_->{height} * $_->{width} } = $_->{file_id};
+   }
+
+   my $largest = (sort keys %sizes)[0];
+
+   use Data::Dumper;
+   print Dumper(\%sizes);
+
+   #TODO upload photo somewhere and return a URL
+}
+
+sub tg_text_prepare {
+   my $upd = shift // return "";
+   return "" unless (my $text = $upd->{message}{text});
+
+   my $src = join " ", $upd->{message}{from}{first_name},
+   $upd->{message}{from}{last_name} // '';
+
+   if (defined $upd->{message}{reply_to_message}) {
+      my $reply = join " ",
+      $upd->{message}{reply_to_message}{from}{first_name},
+      $upd->{message}{reply_to_message}{from}{last_name} // '';
+
+      if (
+         $tg_name eq
+         '@' . ($upd->{message}{reply_to_message}{from}{username} // '')
+      ) {
+         # assuming my messages are only text
+         if (defined $upd->{message}{reply_to_message}{text}) {
+            ($reply) =
+            $upd->{message}{reply_to_message}{text} =~ m/^([^:]+):/;
+         }
+      }
+
+      $src .= ": $reply";
+      $src = $reply if $text =~ m{^\s*([+-])\1*\s*$};
+   }
+
+   # Ehhh~~! Ugly code ;-(
+   $src =~ s/ +/ /g;
+   $src =~ s/ (?=(:|$))//g;
+
+   return "$src: " . $text;
+}
+
 sub thr_tg {
    # fucking shity Chineese code ;-(
    my $tg = WWW::Telegram::BotAPI->new(token=>$token);
@@ -154,38 +205,11 @@ sub thr_tg {
             $starting = 0;
          }
 
-         next unless (my $text = $upd->{message}{text});
-
          next if $upd->{message}{chat}{id} ne $tg_chat_id;
 
-         my $src = join " ", $upd->{message}{from}{first_name},
-         $upd->{message}{from}{last_name} // '';
+         push @ja_queue, tg_text_prepare $upd, $tg if $upd->{message}{text};
 
-         if (defined $upd->{message}{reply_to_message}) {
-            my $reply = join " ",
-            $upd->{message}{reply_to_message}{from}{first_name},
-            $upd->{message}{reply_to_message}{from}{last_name} // '';
-
-            if (
-               $tg_name eq
-               '@' . ($upd->{message}{reply_to_message}{from}{username} // '')
-            ) {
-               # assuming my messages are only text
-               if (defined $upd->{message}{reply_to_message}{text}) {
-                  ($reply) =
-                  $upd->{message}{reply_to_message}{text} =~ m/^([^:]+):/;
-               }
-            }
-
-            $src .= ": $reply";
-            $src = $reply if $text =~ m{^\s*([+-])\1*\s*$};
-         }
-
-         # Ehhh~~! Ugly code ;-(
-         $src =~ s/ +/ /g;
-         $src =~ s/ (?=(:|$))//g;
-
-         push @ja_queue, "$src: " . $text;
+         push @ja_queue, tg_photo_prepare $upd, $tg if $upd->{message}{photo};
       }
    }
 
