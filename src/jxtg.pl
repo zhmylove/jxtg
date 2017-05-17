@@ -14,6 +14,7 @@ use threads::shared;
 use Time::HiRes 'usleep';
 use WWW::Telegram::BotAPI;
 use Net::Jabber::Bot;
+use JSON::MaybeXS;
 use Storable;
 
 my $config_file = './config.pl';
@@ -37,6 +38,7 @@ my $tg_name       = $cfg{tg_name}         // '@korg_jxtg_bot';
 my $tg_chat_id    = $cfg{tg_chat_id}      // 1;
 my $token         = $cfg{token}           // 'token';
 my $sleep_usec    = $cfg{sleep_usec}      // 500000;
+my $max_img_size  = $cfg{max_img_size}    // 10485760;
 my $conference_server   = $cfg{conference_server}  // 'conference.jabber.ru';
 my %room_passwords      = %{ $cfg{room_passwords}  // {
    'ubuntulinux' => 'ubuntu'
@@ -66,7 +68,7 @@ sub thr_mon {
    for(;;sleep(15)){
       my $count = (eval join "+", map {$T{$_}->is_running()} @T) // 0;
       if (0+@T != $count) {
-         print "Self-monitor: threads: $count / " . 0+@T;
+         print "Self-monitor: threads: $count / " . (0+@T);
          exit(0x13);
       }
    }
@@ -130,18 +132,45 @@ sub thr_q_ja {
 sub tg_photo_prepare {
    my $upd = shift // return "";
    my $tg = shift // return "";
+   my $ret = "";
 
    my %sizes = ();
    for (@{ $upd->{message}{photo} }) {
       $sizes{ $_->{height} * $_->{width} } = $_->{file_id};
    }
 
-   my $largest = (sort keys %sizes)[0];
+   my $largest = (sort {int $b <=> int $a} keys %sizes)[0];
 
-   use Data::Dumper;
-   print Dumper(\%sizes);
+   $ret = $upd->{message}{caption} . ": " if defined $upd->{message}{caption};
 
-   #TODO upload photo somewhere and return a URL
+   my $file = $tg->getFile({file_id => $sizes{$largest}});
+
+   return unless (defined $file && $file &&
+      (ref $file eq "HASH") && $file->{ok});
+
+   my $size = $file->{result}{file_size} // ($max_img_size + 1);
+
+   return $ret . "слишком большая картинка :(" if $size > $max_img_size;
+
+   my $url = "https://api.telegram.org/file/bot$token/" .
+   $file->{result}{file_path};
+
+   my $upload_url = "http://uploads.im/api?upload=$url";
+
+   my $get = LWP::UserAgent->new()->get($upload_url);
+
+   my $resp = JSON::MaybeXS::decode_json($get->decoded_content);
+
+   return unless ($get->is_success && $resp && $resp->{status_code} == 200);
+
+   my $src = join " ", $upd->{message}{from}{first_name},
+   $upd->{message}{from}{last_name} // '';
+   
+   # Ehhh~~! Ugly code ;-(
+   $src =~ s/ +/ /g;
+   $src =~ s/ (?=(:|$))//g;
+
+   return "$src: $ret" . $resp->{data}{img_url};
 }
 
 sub tg_text_prepare {
@@ -204,6 +233,8 @@ sub thr_tg {
             next unless (($upd->{message}{date} // 0) >= $start_time);
             $starting = 0;
          }
+
+         next unless defined $upd->{message};
 
          next if $upd->{message}{chat}{id} ne $tg_chat_id;
 

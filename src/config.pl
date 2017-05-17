@@ -27,3 +27,5 @@ $cfg{tg_chat_id}  = 1;
 # MISC
 # Time in uSeconds to wait between queue run (0.5 sec by default)
 $cfg{sleep_usec}  = 500000;
+# Max image size to transfer from Telegram to Jabber
+$cfg{max_img_size}= 10485760;
