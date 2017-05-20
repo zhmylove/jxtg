@@ -181,6 +181,7 @@ sub tg_text_prepare {
    $upd->{message}{from}{last_name} // '';
 
    if (defined $upd->{message}{reply_to_message}) {
+      my $tome = 0; # a reply to me (a jabber message)
       my $reply = join " ",
       $upd->{message}{reply_to_message}{from}{first_name},
       $upd->{message}{reply_to_message}{from}{last_name} // '';
@@ -191,13 +192,16 @@ sub tg_text_prepare {
       ) {
          # assuming my messages are only text
          if (defined $upd->{message}{reply_to_message}{text}) {
+            $tome =
+            $upd->{message}{reply_to_message}{from}{first_name} eq $name;
+
             ($reply) =
             $upd->{message}{reply_to_message}{text} =~ m/^([^:]+):/;
          }
       }
 
       $src .= ": $reply";
-      $src = $reply if $text =~ m{^\s*([+-])\1*\s*$};
+      $src = $reply if $text =~ m{^\s*([+-])\1*\s*$} and $tome;
    }
 
    # Ehhh~~! Ugly code ;-(
