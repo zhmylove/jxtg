@@ -45,8 +45,9 @@ my %room_passwords      = %{ $cfg{room_passwords}  // {
 }};
 
 # INTERNAL VARIABLES
-my @tg_queue :shared; share(@tg_queue);
-my @ja_queue :shared; share(@ja_queue);
+my @tg_queue :shared;
+my @ja_queue :shared;
+my %tg_nick :shared;
 my $start_time = time;
 my %room_list;
 $room_list{$_} = [] for keys %room_passwords; # [] due to Bot.pm.patch
@@ -74,7 +75,7 @@ sub thr_mon {
    }
 }
 
-# TELEGRAM THREAD
+# TELEGRAM THREAD SENDING MESSAGES
 sub thr_q_tg {
    # fucking shity Chineese code ;-(
    my $tg = WWW::Telegram::BotAPI->new(token=>$token);
@@ -94,7 +95,7 @@ sub thr_q_tg {
    exit(0x33);
 }
 
-# JABBER THREAD
+# JABBER THREAD SENDING MESSAGES
 sub thr_q_ja {
    # fucking shity Chineese code ;-(
    my $bot = Net::Jabber::Bot->new(
@@ -130,8 +131,9 @@ sub thr_q_ja {
 }
 
 sub tg_photo_prepare {
-   my $upd = shift // return "";
-   my $tg = shift // return "";
+   my ($upd, $tg) = @_;
+   return "" unless defined $upd && defined $tg;
+
    my $ret = "";
 
    my %sizes = ();
@@ -163,28 +165,27 @@ sub tg_photo_prepare {
 
    return unless ($get->is_success && $resp && $resp->{status_code} == 200);
 
-   my $src = join " ", $upd->{message}{from}{first_name},
-   $upd->{message}{from}{last_name} // '';
+   my $src = join " ", grep defined,
+   $upd->{message}{from}{first_name}, $upd->{message}{from}{last_name};
    
-   # Ehhh~~! Ugly code ;-(
-   $src =~ s/ +/ /g;
-   $src =~ s/ (?=(:|$))//g;
-
    return "$src: $ret" . $resp->{data}{img_url};
 }
 
 sub tg_text_prepare {
-   my $upd = shift // return "";
+   my ($upd) = @_ or return "";
    return "" unless (my $text = $upd->{message}{text});
 
-   my $src = join " ", $upd->{message}{from}{first_name},
-   $upd->{message}{from}{last_name} // '';
+   my $src = join " ", grep defined, $upd->{message}{from}{first_name},
+   $upd->{message}{from}{last_name};
+
+   $tg_nick{$src} = '@' . $upd->{message}{from}{username} if
+   ! defined $tg_nick{$src} && defined $upd->{message}{from}{username};
 
    if (defined $upd->{message}{reply_to_message}) {
       my $tome = 0; # a reply to me (a jabber message)
-      my $reply = join " ",
+      my $reply = join " ", grep defined,
       $upd->{message}{reply_to_message}{from}{first_name},
-      $upd->{message}{reply_to_message}{from}{last_name} // '';
+      $upd->{message}{reply_to_message}{from}{last_name};
 
       if (
          $tg_name eq
@@ -201,16 +202,13 @@ sub tg_text_prepare {
       }
 
       $src .= ": $reply";
-      $src = $reply if $text =~ m{^\s*([+-])\1*\s*$} and $tome;
+      $src = $reply if $text =~ m{^\s*([+-])\1*\s*$} and $tome; # for karma
    }
-
-   # Ehhh~~! Ugly code ;-(
-   $src =~ s/ +/ /g;
-   $src =~ s/ (?=(:|$))//g;
 
    return "$src: " . $text;
 }
 
+# TELEGRAM THREAD READING MESSAGES
 sub thr_tg {
    # fucking shity Chineese code ;-(
    my $tg = WWW::Telegram::BotAPI->new(token=>$token);
@@ -259,6 +257,8 @@ sub process_ja_msg {
    return if $src eq $alias or $src eq $name;
 
    my $text = $msg{'body'};
+
+   $text =~ s{^\s*([^:]+?)(?{ $. = $tg_nick{$1} // $1 })\s*?(:\s*?\S*?)}{$.$2};
    $text =~ s/</^/g;
    $text =~ s/>/^/g;
    $text =~ s/&/./g;
@@ -266,6 +266,7 @@ sub process_ja_msg {
    push @tg_queue, "<b>$src</b>: " . $text;
 }
 
+# JABBER THREAD READING MESSAGES
 sub thr_ja {
    # fucking shity Chineese code ;-(
    my $bot = Net::Jabber::Bot->new(
