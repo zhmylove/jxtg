@@ -52,7 +52,9 @@ my $start_time = time;
 my %room_list;
 $room_list{$_} = [] for keys %room_passwords; # [] due to Bot.pm.patch
 
-$SIG{INT} = sub { print "Uptime: ", time - $start_time ; exit 0; };
+$SIG{INT} = sub { print localtime . " Uptime: ", time - $start_time ; exit 0; };
+
+print localtime . " Starting JXTG bot...";
 
 # PREPARE THREADS
 my @T = qw/thr_tg thr_ja thr_q_tg thr_q_ja/;
