@@ -52,7 +52,9 @@ my $start_time = time;
 my %room_list;
 $room_list{$_} = [] for keys %room_passwords; # [] due to Bot.pm.patch
 
-$SIG{INT} = sub { print localtime . " Uptime: ", time - $start_time ; exit 0; };
+$SIG{INT} = sub {
+   print localtime . " Uptime: ", time - $start_time ; exit 0;
+};
 
 print localtime . " Starting JXTG bot...";
 
@@ -264,6 +266,8 @@ sub process_ja_msg {
    $text =~ s/</^/g;
    $text =~ s/>/^/g;
    $text =~ s/&/./g;
+
+   return unless length $text;
 
    push @tg_queue, "<b>$src</b>: " . $text;
 }
